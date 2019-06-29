@@ -5,7 +5,7 @@ python:
   - "2.7"
   - "3.7"
 env:
-  - CUDA=10.1.105-1 CUDA_APT=10-1 CUDA_SHORT=10.1 UBUNTU_VERSION=ubuntu1804 NCCL=1.0.0-1
+  - CUDA=9.0.176-1 CUDA_APT=9-0 CUDA_SHORT=9.0 UBUNTU_VERSION=ubuntu1604 NCCL=2.3.7-1
 before_install:
   - CUDA_REPO=cuda-repo-${UBUNTU_VERSION}_${CUDA}_amd64.deb
   - NCCL_REPO=nvidia-machine-learning-repo-${UBUNTU_VERSION}_${NCCL}_amd64.deb
@@ -21,7 +21,15 @@ install:
   - CUDA_HOME=/usr/local/cuda-${CUDA_SHORT}
   - LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
   - PATH=${CUDA_HOME}/bin:${PATH}
-  - pip install mxnet-cu101 tensorflow-gpu torch torchvision
+  - pip install mxnet-cu90==1.4.1 tensorflow-gpu==1.12.0 torch==1.0.1 torchvision==0.2.2
 script:
   - BYTEPS_CUDA_HOME=${CUDA_HOME}
+  - update-alternatives --install /usr/bin/gcc gcc $(readlink -f $(which gcc)) 100 && \
+    update-alternatives --install /usr/bin/x86_64-linux-gnu-gcc x86_64-linux-gnu-gcc $(readlink -f $(which gcc)) 100 && \
+    update-alternatives --install /usr/bin/g++ g++ $(readlink -f $(which g++)) 100 && \
+    update-alternatives --install /usr/bin/x86_64-linux-gnu-g++ x86_64-linux-gnu-g++ $(readlink -f $(which g++)) 100
+  - update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.9 200 && \
+    update-alternatives --install /usr/bin/x86_64-linux-gnu-gcc x86_64-linux-gnu-gcc /usr/bin/gcc-4.9 200 && \
+    update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-4.9 200 && \
+    update-alternatives --install /usr/bin/x86_64-linux-gnu-g++ x86_64-linux-gnu-g++ /usr/bin/g++-4.9 200
   - python setup.py install
