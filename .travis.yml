@@ -5,7 +5,7 @@ python:
   - "2.7"
   - "3.7"
 env:
-  - CUDA=9.0.176-1 CUDA_APT=9-0 CUDA_SHORT=9.0 UBUNTU_VERSION=ubuntu1604 NCCL=2.3.7-1
+  - CUDA=9.0.176-1 CUDA_APT=9-0 CUDA_SHORT=9.0 UBUNTU_VERSION=ubuntu1604 NCCL=1.0.0-1
 before_install:
   - CUDA_REPO=cuda-repo-${UBUNTU_VERSION}_${CUDA}_amd64.deb
   - NCCL_REPO=nvidia-machine-learning-repo-${UBUNTU_VERSION}_${NCCL}_amd64.deb
