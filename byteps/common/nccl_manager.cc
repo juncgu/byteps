@@ -50,7 +50,9 @@ NcclManager::NcclManager(std::shared_ptr<BytePSComm> comm) {
 }
 
 ncclComm_t NcclManager::GetComm(uint64_t key, QueueType op) {
-    return _nccl_comm[key % _nccl_num_rings];
+    size_t index = key % _nccl_num_rings;
+    InitComm(index);
+    return _nccl_comm[index];
 }
 
 cudaStream_t NcclManager::GetStream(uint64_t key, QueueType op) {
@@ -85,13 +87,13 @@ void NcclManager::ConstructRings() {
     _nccl_id = (ncclUniqueId*) malloc(sizeof(ncclUniqueId) * _nccl_num_rings);
     _nccl_comm = (ncclComm_t*) malloc(sizeof(ncclComm_t) * _nccl_num_rings);
     _nccl_stream  = (cudaStream_t*) malloc(sizeof(cudaStream_t) *_nccl_num_rings);
+    _nccl_comm_inited = (bool*) malloc(sizeof(bool) *_nccl_num_rings);
     _nccl_size = _nccl_pcie_size;
     int greatest_priority;
     CUDA_CALL(cudaDeviceGetStreamPriorityRange(NULL, &greatest_priority));
 
     for (size_t i = 0; i < _nccl_num_rings; i++) {
         auto nccl_id = _nccl_id + i;
-        auto nccl_comm = _nccl_comm + i;
         auto nccl_stream = _nccl_stream + i;
 
         // synchronize NCCL IDs
@@ -112,9 +114,8 @@ void NcclManager::ConstructRings() {
                         << ", local_rank=" << local_rank;
         }
 
-        // initialize NCCL rank
-        auto rank = local_rank % _nccl_pcie_size;
-        NCCLCHECK(ncclCommInitRank(nccl_comm, _nccl_pcie_size, *nccl_id, rank));
+        // We delay ncclCommInitRank to save GPU memory in the starting stage
+        _nccl_comm_inited[i] = false;
 
         // initialize CUDA streams for NCCL
         CUDA_CALL(cudaStreamCreateWithPriority(nccl_stream, 
@@ -153,6 +154,18 @@ void NcclManager::InitGlobalEnv() { // init all global env/param here
                         atoi(getenv("BYTEPS_NCCL_NUM_RINGS")) : 1);
     BPS_LOG(DEBUG) << "nccl_num_rings" << " set to " << _nccl_num_rings;
 
+    return;
+}
+
+void NcclManager::InitComm(size_t index) {
+    std::lock_guard<std::mutex> lock(_nccl_init_mutex);
+    if (!_nccl_comm_inited[index]) {
+        auto nccl_id = _nccl_id + index;
+        auto nccl_comm = _nccl_comm + index;
+        auto rank = BytePSGlobal::GetLocalRank() % _nccl_pcie_size;
+        NCCLCHECK(ncclCommInitRank(nccl_comm, _nccl_pcie_size, *nccl_id, rank));
+        _nccl_comm_inited[index] = true;
+    }
     return;
 }
 
@@ -269,7 +282,9 @@ void NcclManagerExpr::ConstructRings() {
 
 ncclComm_t NcclManagerExpr::GetComm(uint64_t key, QueueType op) {
     auto offset = (op == REDUCE) ? 0 : _nccl_pcie_size;
-    return _nccl_comm[key % _nccl_pcie_size + offset];
+    size_t index = key % _nccl_pcie_size + offset;
+    InitComm(index);
+    return _nccl_comm[index];
 }
 
 cudaStream_t NcclManagerExpr::GetStream(uint64_t key, QueueType op) {

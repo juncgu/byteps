@@ -49,12 +49,16 @@ public:
     ~NcclManager() {
         if (_nccl_stream) {
             CUDA_CALL(cudaStreamDestroy(*_nccl_stream));
+            free(_nccl_stream);
         }
         if (_nccl_id) {
             free(_nccl_id);
         }
         if (_nccl_comm) {
             free(_nccl_comm);
+        }
+        if (_nccl_comm_inited) {
+            free(_nccl_comm_inited);
         }
         if (_signal_comm) {
             _signal_comm.reset();
@@ -84,11 +88,14 @@ public:
 protected:
     void InitGlobalEnv();
     virtual void ConstructRings();
+    void InitComm(size_t index);
 
     cudaStream_t* _nccl_stream;
     ncclUniqueId* _nccl_id;
     ncclComm_t* _nccl_comm;
-    
+    bool* _nccl_comm_inited;
+    std::mutex _nccl_init_mutex;
+
     // global user-defined env
     size_t _nccl_group_size;
     size_t _nccl_pcie_size;
